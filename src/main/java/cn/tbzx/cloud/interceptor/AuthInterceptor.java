@@ -36,8 +36,15 @@ public class AuthInterceptor implements HandlerInterceptor {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        // 开放端点
-        if (path.startsWith("/api/auth/") || path.equals("/api/devices/register")) {
+        // CORS 预检: OPTIONS 直接放行 (由 WebConfig 的 CORS 配置答复)
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            return true;
+        }
+
+        // 开放端点 (注册/登录/验证码; /api/auth/me 属受保护, 需 JWT, 故不在此列)
+        if (path.equals("/api/auth/register") || path.equals("/api/auth/login")
+                || path.equals("/api/auth/captcha")
+                || path.equals("/api/devices/register")) {
             return true;
         }
 

@@ -43,6 +43,9 @@ tbzx:
   session-idle-close-seconds: 300
   # alert image storage dir (relative to working dir; nginx serves same dir in prod)
   image-dir: ./data/images
+  # CORS: 允许的前端来源 (逗号分隔)。开发期为各人 vite 端口; 生产改为真实域名
+  cors:
+    allowed-origins: http://localhost:5173,http://localhost:5174,http://localhost:5175
 
 logging:
   level:
