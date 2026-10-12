@@ -1,0 +1,170 @@
+# ============================================================
+# 瞳伴随行 tbzx-cloud API 冒烟测试 (IDEA HTTP Client 直接运行)
+# 运行方式: 逐条点左侧绿色箭头; 登录后把 token 填到 @token 行
+# 前置: MySQL 已执行 sql/schema.sql, 应用已启动 (8080)
+# 演示账号: test / 123456 (启动时自动创建)
+# 演示设备: TBZX-DEMO00001, 上报密钥 demo-key-123456
+# ============================================================
+
+@host = http://localhost:8080
+@deviceId = TBZX-DEMO00001
+@apiKey = demo-key-123456
+
+# ---------- 1. 家属注册 (只需跑一次) ----------
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "test2",
+  "password": "123456",
+  "realName": "测试家属2"
+}
+
+###
+
+# ---------- 2. 家属登录 → 拿 token ----------
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "test",
+  "password": "123456"
+}
+
+> {%
+    client.log("把下面的 token 填到文件顶部 @token 行:");
+    client.log(response.body.token);
+%}
+
+###
+
+@token = 在这里粘贴登录返回的token
+
+# ---------- 3. 设备注册 (出厂注册, 开放接口) ----------
+POST {{host}}/api/devices/register
+Content-Type: application/json
+
+{
+  "deviceName": "新助行设备"
+}
+
+> {%
+    client.log("记下来: deviceId=" + response.body.deviceId + "  apiKey=" + response.body.apiKey);
+%}
+
+###
+
+# ---------- 4. 我的设备列表 ----------
+GET {{host}}/api/devices
+Authorization: Bearer {{token}}
+
+###
+
+# ---------- 5. 绑定设备 ----------
+POST {{host}}/api/devices/{{deviceId}}/bind
+Authorization: Bearer {{token}}
+
+###
+
+# ---------- 6. 设备心跳 (ApiKey 鉴权) ----------
+POST {{host}}/api/devices/{{deviceId}}/heartbeat
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "batteryLevel": 85
+}
+
+###
+
+# ---------- 7. 位置上报 3 个点 (ApiKey 鉴权) ----------
+# timestamp 用当前时间前后几秒; 重复执行这条会因幂等键 accepted 变小
+POST {{host}}/api/devices/{{deviceId}}/locations
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "locations": [
+    { "lat": 32.07270, "lng": 118.79450, "accuracy": 5.0, "speed": 1.2, "timestamp": "2026-09-27T23:00:00" },
+    { "lat": 32.07272, "lng": 118.79452, "accuracy": 4.0, "speed": 1.1, "timestamp": "2026-09-27T23:00:05" },
+    { "lat": 32.07275, "lng": 118.79455, "accuracy": 4.0, "speed": 1.0, "timestamp": "2026-09-27T23:00:10" }
+  ]
+}
+
+###
+
+# ---------- 8. 最新位置 (家属轮询的就是这条) ----------
+GET {{host}}/api/devices/{{deviceId}}/latest-location
+Authorization: Bearer {{token}}
+
+###
+
+# ---------- 9. 出行记录列表 ----------
+GET {{host}}/api/devices/{{deviceId}}/sessions
+Authorization: Bearer {{token}}
+
+###
+
+# ---------- 10. 历史轨迹 (把 sessionId 换成第 9 条的 id) ----------
+@sessionId = 1
+GET {{host}}/api/sessions/{{sessionId}}/track
+Authorization: Bearer {{token}}
+
+###
+
+# ---------- 11. 安全区域: 新建 ----------
+POST {{host}}/api/devices/{{deviceId}}/zones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "zoneName": "家附近",
+  "centerLat": 32.07271,
+  "centerLng": 118.79451,
+  "radiusM": 300
+}
+
+> {%
+    client.log("zone id = " + response.body.id);
+%}
+
+###
+
+# ---------- 12. 安全区域: 列表 ----------
+GET {{host}}/api/devices/{{deviceId}}/zones
+Authorization: Bearer {{token}}
+
+###
+
+# ---------- 13. 安全区域: 启停 / 删除 ----------
+@zoneId = 1
+PATCH {{host}}/api/zones/{{zoneId}}/toggle
+Authorization: Bearer {{token}}
+
+###
+
+DELETE {{host}}/api/zones/{{zoneId}}
+Authorization: Bearer {{token}}
+
+###
+
+# ---------- 14. 告警列表 ----------
+GET {{host}}/api/devices/{{deviceId}}/alerts?page=1&size=20
+Authorization: Bearer {{token}}
+
+###
+
+# ---------- 15. 负向用例: 无 ApiKey 上报应 401 ----------
+POST {{host}}/api/devices/{{deviceId}}/locations
+Content-Type: application/json
+
+{
+  "locations": [
+    { "lat": 32.07, "lng": 118.79, "timestamp": "2026-09-27T23:30:00" }
+  ]
+}
+
+###
+
+# ---------- 16. 负向用例: 家属接口无 JWT 应 401 ----------
+GET {{host}}/api/devices/{{deviceId}}/latest-location

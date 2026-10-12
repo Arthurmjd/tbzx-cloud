@@ -1,0 +1,49 @@
+server:
+  port: 8080
+  shutdown: graceful            # drain in-flight requests before closing the port
+
+spring:
+  application:
+    name: tbzx-cloud
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  datasource:
+    url: jdbc:mysql://localhost:3306/tbzx_cloud?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: dxh123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      idle-timeout: 300000       # 5 min: reclaim idle connections
+      max-lifetime: 1200000      # 20 min: refresh before MySQL wait_timeout (8h)
+      connection-timeout: 10000  # wait at most 10s to acquire a connection
+  jackson:
+    time-zone: GMT+8
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+# tbzx business config
+tbzx:
+  # JWT secret (MUST change in production, length >= 32 chars)
+  jwt-secret: tbzx-dev-secret-key-please-change-in-production-0123456789
+  jwt-expire-hours: 168         # family login token 7 days
+  # if user/device tables are empty on boot, seed demo data (dev only)
+  init-demo-data: true
+  # online if last heartbeat within this many seconds
+  online-threshold-seconds: 90
+  # auto-close session after this many idle seconds
+  session-idle-close-seconds: 300
+  # alert image storage dir (relative to working dir; nginx serves same dir in prod)
+  image-dir: ./data/images
+
+logging:
+  level:
+    cn.tbzx: debug
